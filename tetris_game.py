@@ -51,6 +51,162 @@ ATTACK_TABLE = {
     3: 3,
     4: 4,  # tetris sends 4
 }
+# -------------------- VS CHAT CONFIG --------------------
+
+CPU_CHAT_LINES = {
+    "easy": [
+        "Chiharu just vibing on that stack.",
+        "lowkey rooting for Chiharu rn.",
+        "Chiharu's board looking cozy.",
+        "don't bully Chiharu pls 😭",
+        "Chiharu defense kinda clean.",
+        "yo Chiharu actually cooking!",
+        "clean downstack from Chiharu.",
+        "I believe in Chiharu comeback.",
+        "nice skim from Chiharu.",
+        "Chiharu saving that well, smart.",
+        "slow but steady, go Chiharu.",
+        "Chiharu survived that cheese omg.",
+        "Chiharu with the clutch rotate.",
+        "ayo Chiharu almost topped out lol.",
+        "that misdrop hurt but Chiharu fine.",
+        "Chiharu stacking for the long bar fr.",
+        "ok Chiharu finally sending some lines.",
+        "Chiharu RNG kinda cursed right now.",
+        "watch Chiharu T-spin outta nowhere.",
+        "Chiharu gamer focus face rn.",
+    ],
+    "medium": [
+        "greaper actually sweating this set.",
+        "yo greaper's APM going crazy.",
+        "that spike from greaper was nasty.",
+        "greaper really farming garbage rn.",
+        "clean downstack B2B from greaper.",
+        "greaper living in the red bar lol.",
+        "no misdrops, greaper locked in.",
+        "greaper got that tournament stack.",
+        "ayo that tetris from greaper went hard.",
+        "greaper cooking up a spike fr.",
+        "player gotta respect greaper's garbage.",
+        "greaper just surfing cheese like it's nothing.",
+        "yo greaper with the clutch cancel.",
+        "greaper's well management on point.",
+        "this is greaper diff tbh.",
+        "greaper stacking 4w? report him 😂",
+        "that PC setup from greaper was wild.",
+        "greaper really said 'no topouts today'.",
+        "back-to-back city, greaper mayor.",
+        "greaper got the bag map downloaded.",
+    ],
+    "hard": [
+        "chadlite about to delete this lobby.",
+        "why queue into chadlite bro 💀",
+        "every stack from chadlite is a spike.",
+        "chadlite does not misdrop, only chooses drama.",
+        "that's not a board, that's a weapon fr.",
+        "chadlite farming tops like it's casual.",
+        "yo chadlite's APM illegal at this rank.",
+        "player getting folded by chadlite rn.",
+        "chadlite literally built different.",
+        "who let chadlite queue on hard mode.",
+        "back-to-back Tetrises from chadlite omg.",
+        "chadlite out here styling, not just winning.",
+        "this is a massacre, gg vs chadlite.",
+        "chadlite seeing the matrix in that stack.",
+        "can't outstack chadlite, just pray.",
+        "garbage going straight up from chadlite lol.",
+        "chadlite sending only red bars today.",
+        "yo chadlite cooking a full course spike.",
+        "that cancel into spike from chadlite was crazy.",
+        "never bet against chadlite, free points.",
+    ],
+}
+
+PLAYER_CHAT_LINES = [
+    "yo player kinda nice with it.",
+    "ok that was a clean tetris.",
+    "player actually cooking fr.",
+    "dude the downstack was WILD.",
+    "definitely smurfing on this CPU lol.",
+    "player got that clutch survival.",
+    "stack looking scary but they chilling.",
+    "ayo that cancel was so clean.",
+    "player really said 'no topout today'.",
+    "someone sign this player already.",
+    "those T-spins lowkey nasty.",
+    "player farming APM on this bot 😂.",
+    "they turned that cheese into a spike, omg.",
+    "bag RNG hates them but they still winning.",
+    "top of the board gaming but they live.",
+    "player's well management on point.",
+    "yo that was a disrespectful tetris lmao.",
+    "player just free-styling at this point.",
+    "kind of a menace stack from player rn.",
+    "nah this player is built for ranked.",
+]
+
+CHAT_USERNAMES = [
+    "TSpinWizard",
+    "BagRNGHater",
+    "PerfectClearFan",
+    "SRSEnjoyer",
+    "IBlockMain",
+    "GarbageStacker",
+    "BackToBackBro",
+    "HoldAbuser",
+    "SevenBagTheory",
+    "UpstackAndy",
+    "DownstackDan",
+    "ComboKid",
+    "SkimMerchant",
+    "GarbageEater",
+    "ClutchTopout",
+    "MisdropMoment",
+    "LineClearLurker",
+    "WellWatcher",
+    "RightSideStack",
+    "LeftWellLarry",
+    "TSpinTodd",
+    "PerfectPeter",
+    "StackDoctor",
+    "ZenStacker",
+    "FirestormFan",
+    "APMAddict",
+    "SpikeWatcher",
+    "DroughtComplainer",
+    "QueuePeeker",
+    "BagBeliever",
+    "GarbageGang",
+    "KOHunter",
+    "AllClearAndy",
+    "BagBlessed",
+    "LineRaceLad",
+    "SprintSweat",
+    "DasTapper",
+    "ARRSpammer",
+    "SoftDropStan",
+    "HardDropHarry",
+    "PCHunter",
+    "CheeseLover",
+    "CheeseHater",
+    "GarbageSurfer",
+    "StackPolice",
+    "InfiniteSpin",
+    "HyperTapper",
+    "TapTapTom",
+    "TopoStacker",
+    "GridGremlin",
+    "WellGuardian",
+    "BlockPartyHost",
+    "LineOutLegend",
+    "DownstackDiva",
+    "PerfectQueue",
+    "FourWideFred",
+    "SpikeSurvivor",
+    "GarbageSniper",
+    "TetrisChatter",
+    "BagAbuser",
+]
 
 
 # -------------------- SHAPES --------------------
@@ -230,6 +386,9 @@ class TetrisGame:
         self.last_clear_time = None
         self.clear_streak = 0
         self.clear_notes_count = self.sounds.get("_clear_count", 0)
+        # track last clear size (for item triggers in VS)
+        self.last_clear_lines = 0
+
 
         # soft drop accel + lock delay
         self.soft_drop_hold = 0.0
@@ -255,6 +414,11 @@ class TetrisGame:
         # VS-related: outgoing attack and garbage queue
         self.attack_outgoing = 0
         self.garbage_incoming = 0
+
+        # track last clear for VS/chat
+        self.last_clear_lines = 0
+        self.last_clear_is_tetris = False
+
 
         # Single-use item system (bomb / drill / wave / robot)
         self.item = None          # "bomb", "drill", "wave", "robot"
@@ -291,6 +455,7 @@ class TetrisGame:
         self.impact_timer = 0.0
         self.clear_flash_count = 0
         self.clear_flash_elapsed = 0.0
+        self.last_clear_lines = 0
 
         self.abilities = []
         self.next_ability_lines = 20
@@ -298,6 +463,10 @@ class TetrisGame:
 
         self.attack_outgoing = 0
         self.garbage_incoming = 0
+
+        self.last_clear_lines = 0
+        self.last_clear_is_tetris = False
+
 
         self.item = None
         self.item_uses_left = 0
@@ -316,20 +485,36 @@ class TetrisGame:
         return self.lines_cleared // 10
 
     def get_fall_interval(self, soft_drop_pressed):
+        """
+        Return the fall interval (seconds between automatic drops).
+
+        - Normal: 'base' depends on level.
+        - Soft drop: starts noticeably faster, then ramps up as you
+          keep holding ↓, but never becomes instant like hard drop.
+        """
+        # base gravity by mode / level
         if self.mode == "sprint":
             base = 0.6
         else:
             level = self.get_level()
             base = max(0.12, 0.8 - level * 0.06)
 
-        if soft_drop_pressed:
-            hold = min(self.soft_drop_hold, 0.8)
-            ratio = hold / 0.8
-            factor = 0.4 - 0.28 * ratio
-            factor = max(0.12, factor)
-            return base * factor
-        else:
+        if not soft_drop_pressed:
             return base
+
+        # how long ↓ has been held (cap at 1s for full momentum)
+        hold = min(self.soft_drop_hold, 1.0)
+        ratio = hold / 1.0  # 0.0 -> 1.0
+
+        # tuning:
+        #   at tap:  base * 0.60  ≈ 1.67x faster
+        #   after ~1s: base * 0.25 ≈ 4x faster
+        start_factor = 0.60   # initial soft-drop factor
+        end_factor   = 0.25   # max momentum factor
+
+        factor = start_factor - (start_factor - end_factor) * ratio
+        return base * factor
+
 
     def current_shape(self):
         return self.current_piece.shape
@@ -403,8 +588,13 @@ class TetrisGame:
         self.current_piece.y = new_y
 
     def handle_line_clear_effects(self, cleared):
+        self.last_clear_lines = cleared
         if cleared <= 0:
             return
+        # remember this clear (VS uses it to trigger chat hype)
+        self.last_clear_lines = cleared
+        self.last_clear_is_tetris = (cleared == 4)
+
 
         # track lines before / after so we can trigger item drops
         prev_lines = self.lines_cleared
@@ -642,6 +832,51 @@ class TetrisGame:
         self.hold_current(slot_index=1)
         # Only count as 'used' if we actually did a hold this piece
         return (not before) and self.hold_used
+
+    # ------------- ITEM EFFECTS (used in VS) -------------
+
+    def item_wave(self, depth=5):
+        """Clear the bottom `depth` rows, regardless of how filled they are."""
+        if self.game_over:
+            return False
+        depth = max(1, min(depth, GRID_HEIGHT))
+        start_row = GRID_HEIGHT - depth
+
+        for y in range(start_row, GRID_HEIGHT):
+            self.grid[y] = [None for _ in range(GRID_WIDTH)]
+
+        # treat this like clearing `depth` lines for stats / flashes
+        self.handle_line_clear_effects(depth)
+        return True
+
+    def item_drill(self):
+        """
+        Drill a 2-wide vertical shaft from top to bottom near the current piece.
+        Clears those cells, then lets the two columns fall down.
+        """
+        if self.game_over:
+            return False
+
+        # aim the drill roughly under the current piece
+        cx = self.current_piece.x + 1
+        cx = max(0, min(GRID_WIDTH - 2, cx))  # 2-wide, stay in bounds
+
+        # clear a 2-wide strip
+        for y in range(GRID_HEIGHT):
+            for dx in (0, 1):
+                self.grid[y][cx + dx] = None
+
+        # gravity just for those two columns
+        for x in (cx, cx + 1):
+            stack = [self.grid[y][x] for y in range(GRID_HEIGHT)
+                     if self.grid[y][x] is not None]
+            for y in range(GRID_HEIGHT - 1, -1, -1):
+                self.grid[y][x] = stack.pop() if stack else None
+
+        cleared = self.clear_lines()
+        self.handle_line_clear_effects(cleared)
+        return True
+
 
     def ability_bomb(self):
         cx = GRID_WIDTH // 2
@@ -992,7 +1227,10 @@ def draw_piece_preview(surface, piece_name, x_offset, y_offset):
                 pygame.draw.rect(surface, color, rct)
                 pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
 
-def draw_piece_preview_small(surface, piece_name, x_offset, y_offset, cell_size):
+def draw_piece_icon_small(surface, piece_name, x_offset, y_offset, cell_size):
+    """Small 4x4 preview used in VS stats panels."""
+    if piece_name is None:
+        return
     shape = ROTATIONS[piece_name][0]
     color = SHAPE_COLORS[piece_name]
     for r in range(4):
@@ -1004,8 +1242,14 @@ def draw_piece_preview_small(surface, piece_name, x_offset, y_offset, cell_size)
                 pygame.draw.rect(surface, color, rct)
                 pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
 
+
 def draw_grid(surface, game, font, mode):
-    field_rect = pygame.Rect(40, 40, PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT)
+    # Center the playfield horizontally in whatever surface size we have
+    surf_w, surf_h = surface.get_size()
+    field_x = (surf_w - PLAYFIELD_WIDTH) // 2
+    field_y = 40
+
+    field_rect = pygame.Rect(field_x, field_y, PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT)
     pygame.draw.rect(surface, DARK_GREY, field_rect)
     pygame.draw.rect(surface, OUTLINE_COLOR, field_rect, 3)
 
@@ -1014,8 +1258,8 @@ def draw_grid(surface, game, font, mode):
         for x in range(GRID_WIDTH):
             color = game.grid[y][x]
             if color is not None:
-                bx = 40 + x * BLOCK_SIZE
-                by = 40 + y * BLOCK_SIZE
+                bx = field_x + x * BLOCK_SIZE
+                by = field_y + y * BLOCK_SIZE
                 r = pygame.Rect(bx, by, BLOCK_SIZE, BLOCK_SIZE)
                 pygame.draw.rect(surface, color, r)
                 pygame.draw.rect(surface, OUTLINE_COLOR, r, 1)
@@ -1032,8 +1276,8 @@ def draw_grid(surface, game, font, mode):
                 if gy < 0:
                     continue
                 if 0 <= gy < GRID_HEIGHT and game.grid[gy][gx] is None:
-                    bx = 40 + gx * BLOCK_SIZE
-                    by = 40 + gy * BLOCK_SIZE
+                    bx = field_x + gx * BLOCK_SIZE
+                    by = field_y + gy * BLOCK_SIZE
                     rct = pygame.Rect(bx, by, BLOCK_SIZE, BLOCK_SIZE)
                     pygame.draw.rect(surface, GHOST_COLOR, rct)
                     pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
@@ -1046,69 +1290,81 @@ def draw_grid(surface, game, font, mode):
                 gy = piece.y + r
                 if gy < 0:
                     continue
-                bx = 40 + gx * BLOCK_SIZE
-                by = 40 + gy * BLOCK_SIZE
+                bx = field_x + gx * BLOCK_SIZE
+                by = field_y + gy * BLOCK_SIZE
                 rct = pygame.Rect(bx, by, BLOCK_SIZE, BLOCK_SIZE)
                 pygame.draw.rect(surface, piece.color, rct)
                 pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
 
     # grid lines
     for x in range(GRID_WIDTH + 1):
-        sx = 40 + x * BLOCK_SIZE
-        pygame.draw.line(surface, GREY, (sx, 40),
-                         (sx, 40 + PLAYFIELD_HEIGHT))
+        sx = field_x + x * BLOCK_SIZE
+        pygame.draw.line(surface, GREY, (sx, field_y),
+                         (sx, field_y + PLAYFIELD_HEIGHT))
     for y in range(GRID_HEIGHT + 1):
-        sy = 40 + y * BLOCK_SIZE
-        pygame.draw.line(surface, GREY, (40, sy),
-                         (40 + PLAYFIELD_WIDTH, sy))
+        sy = field_y + y * BLOCK_SIZE
+        pygame.draw.line(surface, GREY, (field_x, sy),
+                         (field_x + PLAYFIELD_WIDTH, sy))
 
+    # impact flash when a piece locks (on field)
+    if game.impact_timer > 0.0 and game.impact_duration > 0.0:
+        strength = game.impact_timer / game.impact_duration
+        strength = max(0.0, min(1.0, strength))
+        alpha = int(100 * strength)
+        if alpha > 0:
+            impact_surface = pygame.Surface(
+                (PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT), pygame.SRCALPHA
+            )
+            impact_surface.fill((0, 255, 120, alpha))
+            surface.blit(impact_surface, (field_x, field_y),
+                         special_flags=pygame.BLEND_ADD)
 
-
-    # side panel
-    side_x = 40 + PLAYFIELD_WIDTH + 30
+    # side panel to the right of the centered board
+    side_x = field_x + PLAYFIELD_WIDTH + 30
     pygame.draw.rect(surface, BLACK,
-                     pygame.Rect(side_x - 10, 40, 200, PLAYFIELD_HEIGHT))
+                     pygame.Rect(side_x - 10, field_y, 200, PLAYFIELD_HEIGHT))
 
     label = font.render(f"Mode: {mode.capitalize()}", True, WHITE)
-    surface.blit(label, (side_x, 50))
+    surface.blit(label, (side_x, field_y + 10))
 
     lines_label = font.render(f"Lines: {game.lines_cleared}", True, WHITE)
-    surface.blit(lines_label, (side_x, 90))
+    surface.blit(lines_label, (side_x, field_y + 50))
 
     if mode == "sprint":
         time_str = f"Time: {game.elapsed_time:6.2f}s"
         time_label = font.render(time_str, True, WHITE)
-        surface.blit(time_label, (side_x, 130))
+        surface.blit(time_label, (side_x, field_y + 90))
         left_label = font.render(f"Left: {max(0, 100 - game.lines_cleared)}",
                                  True, WHITE)
-        surface.blit(left_label, (side_x, 160))
+        surface.blit(left_label, (side_x, field_y + 120))
     else:
         level = game.get_level()
         lvl_label = font.render(f"Level: {level}", True, WHITE)
-        surface.blit(lvl_label, (side_x, 130))
+        surface.blit(lvl_label, (side_x, field_y + 90))
 
     np_label = font.render("Next:", True, WHITE)
-    surface.blit(np_label, (side_x, 210))
-    draw_piece_preview(surface, game.next_piece.name, side_x, 240)
+    surface.blit(np_label, (side_x, field_y + 170))
+    draw_piece_preview(surface, game.next_piece.name, side_x, field_y + 200)
 
     # hold display (up to 2 slots)
     hold_label = font.render("Hold:", True, WHITE)
-    surface.blit(hold_label, (side_x, 320))
+    surface.blit(hold_label, (side_x, field_y + 280))
     if game.hold_slots[0] is not None:
-        draw_piece_preview(surface, game.hold_slots[0], side_x, 350)
+        draw_piece_preview(surface, game.hold_slots[0], side_x, field_y + 310)
     if game.hold2_unlocked and len(game.hold_slots) > 1:
         label2 = font.render("[slot 2]", True, GREY)
-        surface.blit(label2, (side_x, 430))
+        surface.blit(label2, (side_x, field_y + 390))
         if game.hold_slots[1] is not None:
-            draw_piece_preview(surface, game.hold_slots[1], side_x + 40, 430)
+            draw_piece_preview(surface, game.hold_slots[1],
+                               side_x + 40, field_y + 390)
 
     if game.paused and not game.game_over:
         pause_label = font.render("PAUSED", True, YELLOW)
-        surface.blit(pause_label, (side_x, 500))
+        surface.blit(pause_label, (side_x, field_y + 460))
 
     # abilities hint (lite)
     if mode == "lite" and game.abilities:
-        ab_y = 540
+        ab_y = field_y + 500
         surface.blit(font.render("Abilities:", True, WHITE),
                      (side_x, ab_y))
         for i, ability in enumerate(game.abilities[:3]):
@@ -1130,12 +1386,6 @@ def draw_vs_board(surface, game, font, label_text, origin_x, origin_y):
     cell = VS_BLOCK_SIZE
     field_width = GRID_WIDTH * cell
     field_height = GRID_HEIGHT * cell
-
-    # title + stats ABOVE board so they don't bleed into the box
-    title = font.render(label_text, True, WHITE)
-    surface.blit(title, (origin_x, origin_y - 36))
-    lines_label = font.render(f"Lines: {game.lines_cleared}", True, WHITE)
-    surface.blit(lines_label, (origin_x, origin_y - 16))
 
     field_rect = pygame.Rect(origin_x, origin_y, field_width, field_height)
     pygame.draw.rect(surface, DARK_GREY, field_rect)
@@ -1213,6 +1463,41 @@ def draw_vs_board(surface, game, font, label_text, origin_x, origin_y):
         flash.fill((0, 255, 120, 100))
         surface.blit(flash, (origin_x, origin_y),
                      special_flags=pygame.BLEND_ADD)
+
+def draw_vs_player_stats_panel(surface, game, font, rect, item_name):
+    """Left stats panel in VS: lines, next, hold, current item."""
+    pygame.draw.rect(surface, DARK_GREY, rect)
+    pygame.draw.rect(surface, OUTLINE_COLOR, rect, 2)
+
+    x = rect.x + 10
+    y = rect.y + 10
+    lh = font.get_linesize()
+
+    # lines
+    text = font.render(f"Lines: {game.lines_cleared}", True, WHITE)
+    surface.blit(text, (x, y))
+    y += lh * 2
+
+    # next piece preview
+    surface.blit(font.render("Next:", True, WHITE), (x, y))
+    y += lh
+    if game.next_piece is not None:
+        draw_piece_preview(surface, game.next_piece.name, x, y)
+    y += int(BLOCK_SIZE * 2.5)
+
+    # hold piece
+    surface.blit(font.render("Hold:", True, WHITE), (x, y))
+    y += lh
+    hold_name = game.hold_slots[0] if game.hold_slots and game.hold_slots[0] else None
+    if hold_name:
+        draw_piece_preview(surface, hold_name, x, y)
+    y += int(BLOCK_SIZE * 2.5)
+
+    # current item / power-up
+    label = f"Item: {item_name}" if item_name else "Item: None"
+    surface.blit(font.render(label, True, WHITE), (x, y))
+
+
 
 def draw_crt_overlay(surface):
     w, h = surface.get_size()
@@ -1296,24 +1581,60 @@ def apply_curved_crt(frame_surface, screen):
 
 
 class TetrisVsMatch:
-    """Handles TetrisLite VS vs CPU, with attacks + character animation."""
+    """Handles TetrisLite VS vs CPU, with attacks + character animation.
 
-    def __init__(self, controls, sounds, speed_settings, cpu_frames, font):
+    `difficulty` is "easy", "medium", or "hard" and controls both AI speed
+    and which sprite set is used.
+    """
+
+    def __init__(self, controls, sounds, speed_settings,
+                 cpu_frames_sets, font, difficulty):
         # Use "endless" physics for both sides
         self.player = TetrisGame("endless", controls, sounds, speed_settings)
         self.cpu = TetrisGame("endless", controls, sounds, speed_settings)
 
         self.sounds = sounds
         self.font = font
-        self.cpu_frames = cpu_frames or []
+        self.difficulty = difficulty
+        self.cpu_frames_sets = cpu_frames_sets or {}
+
+        # pick the sprite list for this difficulty (fallback to medium)
+        self.cpu_frames = (
+            self.cpu_frames_sets.get(difficulty)
+            or self.cpu_frames_sets.get("medium")
+            or []
+        )
 
         # attack / garbage
         self.player_attack_buffer = 0
         self.cpu_attack_buffer = 0
 
-        # CPU AI state
-        self.cpu_speed_scale = 0.9
-        self.cpu_move_interval = 0.08
+        # ---------- CPU AI tuning per difficulty ----------
+        if difficulty == "easy":
+            # really slow + derpy
+            # bigger scale => slower gravity
+            self.cpu_speed_scale = 1.40
+            # larger interval => slower horizontal moves / drops
+            self.cpu_move_interval = 0.20
+        elif difficulty == "hard":
+            # fast + sweaty
+            self.cpu_speed_scale = 0.75    # faster gravity
+            self.cpu_move_interval = 0.05  # faster inputs
+        else:  # "medium"
+            self.cpu_speed_scale = 0.95
+            self.cpu_move_interval = 0.09
+
+        # how much of the CPU's raw attack actually turns into garbage
+        # that reaches the player (player uses full attack table)
+        if difficulty == "easy":
+            self.cpu_attack_ratio = 1.0 / 3.0   # every 3 lines -> ~1
+        elif difficulty == "hard":
+            self.cpu_attack_ratio = 1.0         # full power
+        else:  # medium
+            self.cpu_attack_ratio = 0.5         # every 2 -> ~1
+
+
+
         self.cpu_move_timer = 0.0
         self.cpu_current_id = id(self.cpu.current_piece)
         self.cpu_target_x = self.cpu.current_piece.x
@@ -1324,7 +1645,163 @@ class TetrisVsMatch:
         self.cpu_frame_state_time = 0.0
         self.cpu_frame_state_duration = 0.6
 
+        # ---------- CHAT STATE ----------
+        # rolling list of lines for the chat box
+        self.chat_lines = []
+        self.chat_timer = 0.0
+        self.chat_interval = 0.5
+
+        # spam mode (for tetrises)
+        self.chat_spam_active = False
+        self.chat_spam_side = None   # "player" or "cpu"
+        self.chat_spam_timer = 0.0
+        self.chat_spam_interval = 0.01   # every 0.01s while spamming
+
+        # which side the crowd is currently hyped about
+        self.last_sender = None  # "player", "cpu", or None
+
+        # usernames: use the big list you gave
+        self.chat_usernames = list(CHAT_USERNAMES)
+
+        # neutral chatter stays short + generic
+        self.chat_msgs_neutral = [
+            "nice stack tbh",
+            "this layout is clean",
+            "love this CRT look",
+            "warmup game fr",
+            "RNG kinda even rn",
+            "no misdrops yet??",
+            "i miss NES speed lol",
+            "this could go either way",
+            "yo this is tense",
+            "classic tetris vibes",
+        ]
+
+        # player-favoring lines → start with a few, then extend with PLAYER_CHAT_LINES
+        self.chat_msgs_player = [
+            "yo player cooking 🔥",
+            "stack looking clean on left",
+            "nice downstack",
+            "player about to send garbage",
+            "that skim was clutch",
+            "LEFT SIDE LET'S GO",
+            "player got that Tetris vision",
+            "hold usage on point",
+            "player diff rn",
+            "digging like a pro",
+        ]
+        self.chat_msgs_player.extend(PLAYER_CHAT_LINES)
+
+        # CPU-favoring lines depend on difficulty
+        cpu_name = getattr(self, "cpu_name", "CPU")
+        self.chat_msgs_cpu = [
+            f"{cpu_name} kind of nasty w/ it",
+            f"yo {cpu_name} stacking real nice",
+            f"{cpu_name} cooking fr",
+            f"right side pressure insane",
+            f"{cpu_name} RNG diff tbh",
+            f"{cpu_name} about to clap back",
+            f"that was a clean downstack",
+            f"{cpu_name} never misdrops lol",
+            f"{cpu_name} is built different",
+            f"RIGHT SIDE GO GO GO",
+        ]
+
+        diff_key = getattr(self, "difficulty", "medium")  # "easy"/"medium"/"hard"
+        self.chat_msgs_cpu.extend(CPU_CHAT_LINES.get(diff_key, []))
+
+        # hype spam lists for big plays
+        self.chat_msgs_hype_player = [
+            "TETRIS!!", "LEFT SIDE GO CRAZY", "HE COOKIN",
+            "BIG TSPIN ENERGY", "STACK DIFF", "OH MY GOD",
+            "ABSOLUTE JUICE", "SEND THAT GARBAGE",
+        ]
+        self.chat_msgs_hype_cpu = [
+            f"TETRIS BY {cpu_name}!!", "RIGHT SIDE GAMER",
+            "HE'S INSANE", "BRO CHILL 💀", "WHAT A BOARD",
+            "STACK GOD", "UNREAL PRESSURE", "HE DON'T MISS",
+        ]
+
+        # a little system line so chat isn't empty at start
+        self.chat_lines.append("system: connected to TetrisNet :: VS channel")
+
+
+
+        # chat / crowd system
+        self.chat_messages = []
+        self.chat_max_lines = 25
+        self.chat_timer = 0.0
+        self.chat_interval_normal = 0.5    # normal pace
+        self.chat_interval_hype = 0.01     # spam during tetris hype
+        self.chat_hype_source = None       # "player" or "cpu"
+        self.chat_hype_end = 0.0
+        self.last_attacker = None          # last side that actually sent lines
+
+
+
+        # --------- ITEM / POWER-UP STATE (player only) ---------
+        self.item_key = pygame.K_e
+        self.player_item = None  # "bomb", "drill", "wave", "robot" or None
+        self.player_prev_lines = self.player.lines_cleared
+        self.player_item_tens = 0  # how many 10-line thresholds hit
+        self.player_robot_pieces_left = 0
+        self.player_piece_id = id(self.player.current_piece)
+
+        self.item_names = {
+            "bomb": "BOMB",
+            "drill": "DRILL",
+            "wave": "WAVE",
+            "robot": "ROBOT",
+        }
+
     # ---------- CPU HELPERS ----------
+    # ---------- ITEM / POWER-UP LOGIC ----------
+
+    def _give_random_item(self):
+        """Give the player a random item if they don't already have one."""
+        if self.player_item is not None:
+            return
+        self.player_item = random.choice(["bomb", "drill", "wave", "robot"])
+
+    def _maybe_award_item(self):
+        """Called every frame to see if we should give an item."""
+        g = self.player
+        if g.lines_cleared != self.player_prev_lines:
+            # check 10-line milestones
+            tens_now = g.lines_cleared // 10
+            if tens_now > self.player_item_tens:
+                self.player_item_tens = tens_now
+                self._give_random_item()
+
+            # Tetris (4-line clear) also gives an item
+            if g.last_clear_lines == 4:
+                self._give_random_item()
+
+            self.player_prev_lines = g.lines_cleared
+
+    def _activate_item(self):
+        g = self.player
+        if self.player_item is None or g.game_over or g.paused:
+            return
+
+        used = False
+        if self.player_item == "bomb":
+            # reuse existing circular crater ability
+            used = g.ability_bomb()
+        elif self.player_item == "drill":
+            used = g.item_drill()
+        elif self.player_item == "wave":
+            used = g.item_wave(5)
+        elif self.player_item == "robot":
+            if self.player_robot_pieces_left <= 0:
+                # next 15 pieces will be auto-placed
+                self.player_robot_pieces_left = 15
+                self.player_piece_id = id(g.current_piece)
+                used = True
+
+        if used:
+            self.player_item = None
+
     # ---------- CPU HEURISTIC EVAL ----------
 
     def _evaluate_grid(self, grid, lines_cleared):
@@ -1704,6 +2181,98 @@ class TetrisVsMatch:
                 g.current_piece.y = new_y
                 g.on_ground = False
                 g.lock_timer = 0.0
+    # ---------- SIMPLE ROBOT AI FOR PLAYER ----------
+
+    def _grid_collision(self, grid, shape, x, y):
+        for r in range(4):
+            for c in range(4):
+                if shape[r][c] == "#":
+                    gx = x + c
+                    gy = y + r
+                    if gx < 0 or gx >= GRID_WIDTH or gy >= GRID_HEIGHT:
+                        return True
+                    if gy >= 0 and grid[gy][gx] is not None:
+                        return True
+        return False
+
+    def _apply_piece_to_grid_copy(self, grid, shape, x, y):
+        new_grid = [row[:] for row in grid]
+        for r in range(4):
+            for c in range(4):
+                if shape[r][c] == "#":
+                    gx = x + c
+                    gy = y + r
+                    if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+                        new_grid[gy][gx] = PIECE_COLOR
+        # clear full lines in the copy
+        cleared = 0
+        tmp = []
+        for row in new_grid:
+            if all(cell is not None for cell in row):
+                cleared += 1
+            else:
+                tmp.append(row)
+        while len(tmp) < GRID_HEIGHT:
+            tmp.insert(0, [None for _ in range(GRID_WIDTH)])
+        return tmp, cleared
+
+    def _score_grid(self, grid, cleared):
+        heights = [0] * GRID_WIDTH
+        holes = 0
+        for x in range(GRID_WIDTH):
+            started = False
+            for y in range(GRID_HEIGHT):
+                if grid[y][x] is not None:
+                    if not started:
+                        started = True
+                        heights[x] = GRID_HEIGHT - y
+                elif started:
+                    holes += 1
+
+        bump = 0
+        for x in range(GRID_WIDTH - 1):
+            bump += abs(heights[x] - heights[x + 1])
+
+        aggregate_height = sum(heights)
+        # heuristic: reward cleared lines heavily, then penalize holes/height/bump
+        return cleared * 12 - holes * 5 - bump * 2 - aggregate_height
+
+    def _robot_place_current_piece(self):
+        """Auto-place the player's current piece in a 'good' spot."""
+        g = self.player
+        piece = g.current_piece
+        best_score = None
+        best_x = None
+        best_rot = None
+
+        for rot in range(4):
+            shape = ROTATIONS[piece.name][rot]
+            for x in range(-2, GRID_WIDTH):
+                # drop test
+                y = -2
+                if self._grid_collision(g.grid, shape, x, y):
+                    continue
+                while not self._grid_collision(g.grid, shape, x, y + 1):
+                    y += 1
+                if y < -1:
+                    continue
+
+                test_grid, cleared = self._apply_piece_to_grid_copy(
+                    g.grid, shape, x, y
+                )
+                score = self._score_grid(test_grid, cleared)
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_x = x
+                    best_rot = rot
+
+        if best_x is None:
+            return
+
+        # apply best move to real game
+        g.current_piece.rotation = best_rot
+        g.current_piece.x = best_x
+        g.hard_drop()
 
     # ---------- ATTACK / GARBAGE ----------
 
@@ -1713,30 +2282,115 @@ class TetrisVsMatch:
         if p_attack == 0 and c_attack == 0:
             return
 
+        # remember raw values for hype detection
+        raw_p = p_attack
+        raw_c = c_attack
+
         # reset per-step attack counters
         self.player.attack_outgoing = 0
         self.cpu.attack_outgoing = 0
-
-
-
 
         # garbage canceling (like modern VS)
         to_cpu = max(0, p_attack - c_attack)
         to_player = max(0, c_attack - p_attack)
 
+        # crowd sides with whoever actually sends garbage
+        if to_cpu > 0 and to_player == 0:
+            self.last_sender = "player"
+        elif to_player > 0 and to_cpu == 0:
+            self.last_sender = "cpu"
+        # tie / full cancel → no change
+
         if to_cpu > 0:
             self.cpu.apply_garbage(to_cpu)
-            # cpu receives lines → frame 2
+            # cpu receives lines → reaction frame
             if self.cpu_frames:
                 self.cpu_frame_state = "recv"
                 self.cpu_frame_state_time = pygame.time.get_ticks() / 1000.0
 
         if to_player > 0:
             self.player.apply_garbage(to_player)
-            # cpu sends lines → frame 3
+            # cpu sends lines → hype frame
             if self.cpu_frames:
                 self.cpu_frame_state = "send"
                 self.cpu_frame_state_time = pygame.time.get_ticks() / 1000.0
+
+        # detect big plays (roughly "tetris" size) and start chat spam
+        if raw_p >= 4 and raw_p > raw_c:
+            self._start_chat_spam("player")
+        elif raw_c >= 4 and raw_c > raw_p:
+            self._start_chat_spam("cpu")
+
+
+
+    # ---------- CHAT / CROWD ----------
+
+    def _start_chat_hype(self, who):
+        """Start 3s of spammy chat after a Tetris."""
+        now = pygame.time.get_ticks() / 1000.0
+        self.chat_hype_source = who
+        self.chat_hype_end = now + 3.0
+        # crowd sides with the person who just popped off
+        self.last_attacker = who
+
+    def _update_chat(self, dt):
+        """Advance timers and create new chat messages."""
+        # stop hype when timer ends
+        if self.chat_hype_source is not None:
+            now = pygame.time.get_ticks() / 1000.0
+            if now >= self.chat_hype_end:
+                self.chat_hype_source = None
+
+        # no one to cheer for yet? nothing to say
+        if self.last_attacker is None:
+            return
+
+        # choose interval
+        interval = (self.chat_interval_hype
+                    if self.chat_hype_source is not None
+                    else self.chat_interval_normal)
+
+        self.chat_timer += dt
+        while self.chat_timer >= interval:
+            self.chat_timer -= interval
+            self._push_chat_message()
+
+    def _push_chat_message(self):
+        """Append one new line to chat based on last_attacker."""
+        if self.last_attacker is None:
+            return
+
+        username = random.choice(CHAT_USERNAMES)
+
+        if self.last_attacker == "player":
+            line = random.choice(PLAYER_CHAT_LINES)
+        else:
+            diff = getattr(self, "difficulty", "medium")
+            cpu_lines = CPU_CHAT_LINES.get(diff, CPU_CHAT_LINES["medium"])
+            line = random.choice(cpu_lines)
+
+        msg = f"{username}: {line}"
+        self.chat_messages.append(msg)
+        if len(self.chat_messages) > self.chat_max_lines:
+            self.chat_messages.pop(0)
+
+    def _draw_chat_panel(self, surface, x, y, w, h):
+        """Render the faux twitch chat box."""
+        rect = pygame.Rect(x, y, w, h)
+        pygame.draw.rect(surface, (0, 10, 5), rect)
+        pygame.draw.rect(surface, OUTLINE_COLOR, rect, 2)
+
+        title = self.font.render("chat", True, WHITE)
+        surface.blit(title, (x + 8, y + 4))
+
+        line_h = 18
+        max_lines = max(1, (h - 26) // line_h)
+        visible = self.chat_messages[-max_lines:]
+
+        start_y = y + 22
+        for i, msg in enumerate(visible):
+            surf = self.font.render(msg, True, WHITE)
+            surface.blit(surf, (x + 8, start_y + i * line_h))
 
     # ---------- CPU CHARACTER FRAME ----------
 
@@ -1755,8 +2409,89 @@ class TetrisVsMatch:
         phase = int(t) % 2
         return self.cpu_frames[phase]
 
-    # ---------- MAIN LOOP ----------
+    def _push_chat(self, text):
+        """Append a line and keep the chat reasonably short."""
+        self.chat_lines.append(text)
+        if len(self.chat_lines) > 40:
+            self.chat_lines = self.chat_lines[-40:]
 
+    def _start_chat_spam(self, side):
+        """Begin 3 seconds of rapid-fire hype for a big play."""
+        self.chat_spam_active = True
+        self.chat_spam_side = side      # "player" or "cpu"
+        self.chat_spam_timer = 3.0
+        self.chat_timer = 0.0           # reset so it starts right away
+
+    def _update_chat(self, dt):
+        """Advance timers and occasionally add a new chat line."""
+        # update spam timer
+        if self.chat_spam_active:
+            self.chat_spam_timer -= dt
+            if self.chat_spam_timer <= 0:
+                self.chat_spam_active = False
+                self.chat_spam_side = None
+
+        # pick which interval we're using
+        interval = (self.chat_spam_interval
+                    if self.chat_spam_active else self.chat_interval)
+
+        self.chat_timer += dt
+        if self.chat_timer < interval:
+            return
+        self.chat_timer = 0.0
+
+        # decide which message list to pull from
+        side = self.last_sender
+        if self.chat_spam_active and self.chat_spam_side == "player":
+            pool = self.chat_msgs_hype_player
+        elif self.chat_spam_active and self.chat_spam_side == "cpu":
+            pool = self.chat_msgs_hype_cpu
+        else:
+            if side == "player":
+                pool = self.chat_msgs_player
+            elif side == "cpu":
+                pool = self.chat_msgs_cpu
+            else:
+                pool = self.chat_msgs_neutral
+
+        if not pool or not self.chat_usernames:
+            return
+
+        user = random.choice(self.chat_usernames)
+        msg = random.choice(pool)
+        line = f"{user}: {msg}"
+        self._push_chat(line)
+
+
+    def _draw_chat_box(self, surface, font, rect):
+        """Render the faux twitch chat inside rect.
+
+        Expects self.chat_lines to be a list of plain strings, newest at end.
+        Your update logic can push to self.chat_lines however you like.
+        """
+        # frame
+        pygame.draw.rect(surface, DARK_GREY, rect)
+        pygame.draw.rect(surface, OUTLINE_COLOR, rect, 2)
+
+        # label
+        label = font.render("chat", True, WHITE)
+        surface.blit(label, (rect.x + 8, rect.y + 4))
+
+        # how many lines fit
+        line_h = font.get_linesize()
+        max_lines = max(1, (rect.height - 10 - line_h) // line_h)
+
+        # last N lines
+        lines = getattr(self, "chat_lines", [])
+        visible = lines[-max_lines:]
+
+        y = rect.y + 4 + line_h
+        for msg in visible:
+            surf = font.render(msg, True, GREEN)
+            surface.blit(surf, (rect.x + 8, y))
+            y += line_h
+
+    # ---------- MAIN LOOP ----------
     def run(self, state, clock, font):
         running = True
         while running:
@@ -1764,7 +2499,7 @@ class TetrisVsMatch:
             events = pygame.event.get()
             key_state = pygame.key.get_pressed()
 
-            # global events (ESC, F11, quit)
+            # global events (ESC, F11, quit, item key)
             for ev in events:
                 if ev.type == pygame.QUIT:
                     pygame.quit()
@@ -1772,8 +2507,11 @@ class TetrisVsMatch:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_ESCAPE:
                         running = False
-                    if ev.key == pygame.K_F11:
+                    elif ev.key == pygame.K_F11:
                         toggle_fullscreen(state)
+                    elif ev.key == self.item_key:
+                        # try to use current item
+                        self._activate_item()
 
             # keep CPU paused in sync with player
             self.cpu.paused = self.player.paused
@@ -1785,11 +2523,28 @@ class TetrisVsMatch:
             if not self.player.game_over:
                 self._update_cpu(dt)
 
+            # item awarding (based on player's clears)
+            self._maybe_award_item()
+
+            # robot auto-placement for the next N pieces
+            if self.player_robot_pieces_left > 0 and not self.player.game_over:
+                current_id = id(self.player.current_piece)
+                if current_id != self.player_piece_id:
+                    # new piece just spawned
+                    self.player_piece_id = current_id
+                    self._robot_place_current_piece()
+                    self.player_robot_pieces_left -= 1
+
             # attacks & garbage
             self._handle_attacks()
+            # update faux twitch chat
+            self._update_chat(dt)
+
+
 
             # win/lose conditions
             if self.player.game_over or self.cpu.game_over:
+                # determine winner from player perspective
                 if self.player.game_over and not self.cpu.game_over:
                     self.player.win = False
                     self.player.message = "CPU wins."
@@ -1808,81 +2563,103 @@ class TetrisVsMatch:
             frame = state["frame"]
             frame.fill(BLACK)
 
-            # header
-            header = "py-tetris :: TetrisLite VS"
-            frame.blit(self.font.render(header, True, WHITE), (30, 20))
-
-            frame = state["frame"]
-            frame.fill(BLACK)
-
-            # header
             header = "py-tetris :: TetrisLite VS"
             frame.blit(self.font.render(header, True, WHITE), (40, 20))
 
-            field_width_vs = GRID_WIDTH * VS_BLOCK_SIZE
-            field_height_vs = GRID_HEIGHT * VS_BLOCK_SIZE
+            # Layout numbers
+            field_height = GRID_HEIGHT * VS_BLOCK_SIZE
+            stats_width = 180
+            cpu_panel_width = 200
+            gap = 20
 
-            stats_w = 180
-            gap = 32
+            board_width = GRID_WIDTH * VS_BLOCK_SIZE
+            total_width = (
+                stats_width +           # player stats panel
+                gap +
+                board_width +           # player board
+                gap +
+                board_width +           # cpu board
+                gap +
+                cpu_panel_width         # cpu character panel
+            )
 
-            stats_x = 40
-            origin_y = 100  # boards start here
+            frame_w, frame_h = frame.get_size()
+            origin_x = (frame_w - total_width) // 2
+            origin_y = 70
 
-            player_x = stats_x + stats_w + gap
-            cpu_x = player_x + field_width_vs + gap
-            cpu_box_x = cpu_x + field_width_vs + gap
-            cpu_box_w = 170
-            cpu_box_h = field_height_vs
+            # --- rectangles for each column ---
+            stats_rect = pygame.Rect(origin_x, origin_y,
+                                     stats_width, field_height)
 
-            # ----- left STATS panel (matches your "Player stats/held piece..." box) -----
-            stats_rect = pygame.Rect(stats_x, origin_y, stats_w, field_height_vs)
-            pygame.draw.rect(frame, DARK_GREY, stats_rect)
-            pygame.draw.rect(frame, OUTLINE_COLOR, stats_rect, 2)
+            player_x = stats_rect.right + gap
+            cpu_x = player_x + board_width + gap
 
-            frame.blit(self.font.render("PLAYER STATS", True, WHITE),
-                       (stats_x + 10, origin_y - 24))
-            frame.blit(self.font.render(f"Lines: {self.player.lines_cleared}", True, WHITE),
-                       (stats_x + 10, origin_y + 10))
-            # (you can add held / next / abilities text in this same box later)
+            cpu_panel_rect = pygame.Rect(cpu_x + board_width + gap,
+                                         origin_y,
+                                         cpu_panel_width,
+                                         field_height)
 
-            # ----- middle: PLAYER and CPU boards, centered -----
-            draw_vs_board(frame, self.player, self.font, "PLAYER", player_x, origin_y)
-            draw_vs_board(frame, self.cpu, self.font, "CPU", cpu_x, origin_y)
+            # Chat box: spans under both playfields (stats + boards),
+            # not under the CPU character panel.
+            chat_top = origin_y + field_height + 30
+            chat_height = 140
+            chat_width = (cpu_x + board_width) - origin_x
+            chat_rect = pygame.Rect(origin_x, chat_top,
+                                    chat_width, chat_height)
 
-            # ----- right: CPU CHARACTER box -----
-            cpu_rect = pygame.Rect(cpu_box_x, origin_y, cpu_box_w, cpu_box_h)
-            pygame.draw.rect(frame, DARK_GREY, cpu_rect)
-            pygame.draw.rect(frame, OUTLINE_COLOR, cpu_rect, 2)
+            # ---------- PLAYER STATS PANEL ----------
+            stats_label = self.font.render("PLAYER STATS", True, WHITE)
+            frame.blit(stats_label, (stats_rect.x, origin_y - 22))
 
-            frame.blit(self.font.render("CPU", True, WHITE),
-                       (cpu_box_x + 10, origin_y - 24))
-            frame.blit(self.font.render("CHARACTER", True, WHITE),
-                       (cpu_box_x + 10, origin_y - 4))
+            draw_vs_player_stats_panel(
+                frame,
+                self.player,
+                self.font,
+                stats_rect,
+                getattr(self, "player_item_name", "None")  # or however you store it
+            )
+
+            # ---------- BOARDS ----------
+            draw_vs_board(frame, self.player, self.font,
+                          "PLAYER", player_x, origin_y)
+            draw_vs_board(frame, self.cpu, self.font,
+                          "CPU", cpu_x, origin_y)
+
+            # ---------- CPU CHARACTER PANEL ----------
+            cpu_label = self.font.render("CPU CHARACTER", True, WHITE)
+            frame.blit(cpu_label, (cpu_panel_rect.x, origin_y - 22))
+
+            pygame.draw.rect(frame, DARK_GREY, cpu_panel_rect)
+            pygame.draw.rect(frame, OUTLINE_COLOR, cpu_panel_rect, 2)
+
+            # inner square at top of panel for the portrait
+            portrait_margin = 16
+            portrait_size = cpu_panel_rect.width - 2 * portrait_margin
+            portrait_rect = pygame.Rect(
+                cpu_panel_rect.x + portrait_margin,
+                cpu_panel_rect.y + portrait_margin,
+                portrait_size,
+                portrait_size
+            )
 
             cpu_frame = self._get_cpu_frame()
             if cpu_frame is not None:
-                w, h = cpu_frame.get_size()
+                scaled = pygame.transform.scale(
+                    cpu_frame, (portrait_rect.width, portrait_rect.height)
+                )
+                frame.blit(scaled, portrait_rect.topleft)
+            else:
+                # just outline the portrait box if no sprite
+                pygame.draw.rect(frame, OUTLINE_COLOR, portrait_rect, 1)
 
-                # fit into the TOP HALF of the CPU box, with a small margin
-                max_w = cpu_box_w - 20
-                max_h = cpu_box_h // 2 - 20
-                scale = min(max_w / w, max_h / h, 4)
-
-                new_w = max(1, int(w * scale))
-                new_h = max(1, int(h * scale))
-
-                if scale < 1.0:
-                    scaled = pygame.transform.smoothscale(cpu_frame, (new_w, new_h))
-                else:
-                    scaled = pygame.transform.scale(cpu_frame, (new_w, new_h))
-
-                dest_x = cpu_box_x + 10
-                dest_y = origin_y + 10   # near the top of the panel
-                frame.blit(scaled, (dest_x, dest_y))
-
+            # ---------- CHAT BOX (twitch-style) ----------
+            self._draw_chat_box(frame, self.font, chat_rect)
+            # (self.chat_lines etc. are updated elsewhere in your VS logic)
 
             apply_curved_crt(frame, screen)
             pygame.display.flip()
+
+
 
 
             apply_curved_crt(frame, screen)
@@ -2134,6 +2911,73 @@ def settings_loop(state, clock, small_font,
         apply_curved_crt(frame, screen)
         pygame.display.flip()
 
+def difficulty_select_loop(state, clock, font, sounds):
+    """Small menu that asks for VS difficulty and returns 'easy', 'medium', or 'hard'.
+       Returns None if the player hits ESC to go back.
+    """
+    options = ["Easy", "Medium", "Hard"]
+    selected = 1  # default to Medium
+
+    while True:
+        clock.tick(FPS)
+        events = pygame.event.get()
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_ESCAPE:
+                    return None
+                if ev.key == pygame.K_F11:
+                    toggle_fullscreen(state)
+                elif ev.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                    snd = sounds.get("menu_move")
+                    if snd:
+                        snd.play()
+                elif ev.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                    snd = sounds.get("menu_move")
+                    if snd:
+                        snd.play()
+                elif ev.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    snd = sounds.get("menu_select")
+                    if snd:
+                        snd.play()
+                    return options[selected].lower()
+
+        screen = state["screen"]
+        frame = state["frame"]
+        frame.fill(BLACK)
+
+        x0, y0 = 30, 60
+        lh = 26
+
+        header = [
+            "py-tetris :: VS difficulty",
+            "",
+            "choose CPU difficulty:",
+            "",
+        ]
+        for i, line in enumerate(header):
+            frame.blit(font.render(line, True, WHITE), (x0, y0 + i * lh))
+
+        start_y = y0 + len(header) * lh
+        blink_on = (pygame.time.get_ticks() // 400) % 2 == 0
+        for i, opt in enumerate(options):
+            arrow = "->" if (i == selected and blink_on) else "  "
+            text = f"{arrow} {opt}"
+            col = WHITE if i == selected else GREY
+            frame.blit(font.render(text, True, col),
+                       (x0, start_y + i * lh))
+
+        hint = "[UP/DOWN] select  [ENTER] confirm  [ESC] back"
+        frame.blit(font.render(hint, True, GREY),
+                   (x0, start_y + len(options) * lh + 2 * lh))
+
+        apply_curved_crt(frame, screen)
+        pygame.display.flip()
+
 
 def ability_choice_loop(state, clock, font, game):
     owned_ids = {ab["id"] for ab in game.abilities}
@@ -2241,7 +3085,7 @@ def game_over_loop(state, clock, small_font, game, mode):
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_F11:
                     toggle_fullscreen(state)
-                else:
+                elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                     exit_now = True
 
         screen = state["screen"]
@@ -2271,8 +3115,8 @@ def game_over_loop(state, clock, small_font, game, mode):
 
         lines.append("")
         blink_on = (pygame.time.get_ticks() // 400) % 2 == 0
-        prompt = ("-> press any key to return"
-                  if blink_on else "   press any key to return")
+        prompt = ("-> press enter key to return"
+                  if blink_on else "   press enter key to return")
         lines.append(prompt)
 
         for i, line in enumerate(lines):
@@ -2348,18 +3192,47 @@ def main():
     controls = DEFAULT_CONTROLS.copy()
     speed_settings = {"das_ms": 160, "arr_ms": 40}
 
-    # load CPU character frames
-    # load CPU character frames
+    # -------- CPU character frames per difficulty --------
+    # MEDIUM = original (reaper) sprites you already had
     try:
-        cpu_frames = [
+        cpu_frames_medium = [
             pygame.image.load("pixil-frame-0.png").convert_alpha(),
             pygame.image.load("pixil-frame-1.png").convert_alpha(),
             pygame.image.load("pixil-frame-2.png").convert_alpha(),
             pygame.image.load("pixil-frame-3.png").convert_alpha(),
         ]
-    except Exception as e:
-        print("Could not load CPU frames:", e)
-        cpu_frames = []
+    except Exception:
+        cpu_frames_medium = []
+
+    # EASY = anime gamer girl (4 frames: idle A/B, receive, send)
+    try:
+        cpu_frames_easy = [
+            pygame.image.load("anime-0.png").convert_alpha(),
+            pygame.image.load("anime-1.png").convert_alpha(),
+            pygame.image.load("anime-2.png").convert_alpha(),
+            pygame.image.load("anime-3.png").convert_alpha(),
+        ]
+    except Exception:
+        # if anime sprites missing, fall back to medium ones
+        cpu_frames_easy = cpu_frames_medium
+
+    # HARD = Agartha wizard (4 frames)
+    try:
+        cpu_frames_hard = [
+            pygame.image.load("agartha-0.png").convert_alpha(),
+            pygame.image.load("agartha-1.png").convert_alpha(),
+            pygame.image.load("agartha-2.png").convert_alpha(),
+            pygame.image.load("agartha-3.png").convert_alpha(),
+        ]
+    except Exception:
+        cpu_frames_hard = cpu_frames_medium
+
+    cpu_frames_sets = {
+        "easy": cpu_frames_easy,
+        "medium": cpu_frames_medium,
+        "hard": cpu_frames_hard,
+    }
+
 
 
     while True:
@@ -2367,10 +3240,25 @@ def main():
                          controls, speed_settings, sounds)
 
         if mode == "vs":
-            vs = TetrisVsMatch(controls, sounds, speed_settings,
-                               cpu_frames, small_font)
+            # ask for difficulty first
+            difficulty = difficulty_select_loop(
+                state, clock, small_font, sounds
+            )
+            if difficulty is None:
+                # player hit ESC on the difficulty screen
+                continue
+
+            vs = TetrisVsMatch(
+                controls,
+                sounds,
+                speed_settings,
+                cpu_frames_sets,
+                small_font,
+                difficulty,
+            )
             vs.run(state, clock, small_font)
             continue
+
 
         game = TetrisGame(mode, controls, sounds, speed_settings)
 
