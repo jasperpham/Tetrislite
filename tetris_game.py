@@ -3,6 +3,21 @@ import random
 import math
 import array
 import pygame
+import os
+import sys
+
+def resource_path(filename: str) -> str:
+    """
+    Return full path to a file in the 'resources' folder,
+    works in normal Python and in a PyInstaller EXE.
+    """
+    if hasattr(sys, "_MEIPASS"):
+        base_path = sys._MEIPASS  # PyInstaller bundle temp folder
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, "resources", filename)
+
 
 # -------------------- CONFIG --------------------
 
@@ -249,6 +264,12 @@ BASE_SHAPES["Z"] = ["....",
                     "...."]
 
 SHAPE_COLORS = {name: PIECE_COLOR for name in BASE_SHAPES.keys()}
+ITEM_LETTER = {
+    "bomb": "B",
+    "drill": "D",
+    "wave": "W",
+}
+
 
 
 def rotate_grid_90(grid):
@@ -372,6 +393,9 @@ class TetrisGame:
 
         self.das = max(0.0, speed_settings.get("das_ms", 160) / 1000.0)
         self.arr = max(0.01, speed_settings.get("arr_ms", 40) / 1000.0)
+        self.soft_drop_min_interval = max(
+            0.005, speed_settings.get("soft_drop_min_ms", 30) / 1000.0
+        )
 
         self.input_time = 0.0
         self.left_held = False
@@ -423,6 +447,15 @@ class TetrisGame:
         # Single-use item system (bomb / drill / wave / robot)
         self.item = None          # "bomb", "drill", "wave", "robot"
         self.item_uses_left = 0   # usually 1
+        # allow some modes (like VS) to override how items are awarded
+        # when True, the current falling piece is an item instead of a tetromino
+        self.item_active = False
+        self.item_type_active = None  # "bomb", "drill", "wave", "robot"
+
+
+
+        self.enable_item_awards = True
+
 
 
 
@@ -471,6 +504,8 @@ class TetrisGame:
         self.item = None
         self.item_uses_left = 0
 
+        self.item_active = False
+        self.item_type_active = None
 
     def new_piece(self):
         return Tetromino(random.choice(PIECE_TYPES))
@@ -485,36 +520,32 @@ class TetrisGame:
         return self.lines_cleared // 10
 
     def get_fall_interval(self, soft_drop_pressed):
-        """
-        Return the fall interval (seconds between automatic drops).
-
-        - Normal: 'base' depends on level.
-        - Soft drop: starts noticeably faster, then ramps up as you
-          keep holding ↓, but never becomes instant like hard drop.
-        """
-        # base gravity by mode / level
+        # base gravity (same as before)
         if self.mode == "sprint":
             base = 0.6
         else:
             level = self.get_level()
             base = max(0.12, 0.8 - level * 0.06)
 
+        # no soft drop → just use base speed
         if not soft_drop_pressed:
             return base
 
-        # how long ↓ has been held (cap at 1s for full momentum)
-        hold = min(self.soft_drop_hold, 1.0)
-        ratio = hold / 1.0  # 0.0 -> 1.0
+        h = self.soft_drop_hold  # how long we've held soft drop
 
-        # tuning:
-        #   at tap:  base * 0.60  ≈ 1.67x faster
-        #   after ~1s: base * 0.25 ≈ 4x faster
-        start_factor = 0.60   # initial soft-drop factor
-        end_factor   = 0.25   # max momentum factor
+        # 0 – 0.15s: small boost (~2x faster than base)
+        if h < 0.15:
+            return base * 0.5
 
-        factor = start_factor - (start_factor - end_factor) * ratio
-        return base * factor
+        # 0.15 – 0.40s: ramp from (base*0.5) → soft_drop_min_interval
+        if h < 0.40:
+            t = (h - 0.15) / (0.40 - 0.15)  # 0 → 1 over that window
+            early = base * 0.5
+            # linear interpolate early → self.soft_drop_min_interval
+            return early + t * (self.soft_drop_min_interval - early)
 
+        # after 0.40s: constant fast soft drop, controlled by settings slider
+        return self.soft_drop_min_interval
 
     def current_shape(self):
         return self.current_piece.shape
@@ -636,20 +667,56 @@ class TetrisGame:
                 self.pending_ability_choice = True
                 self.paused = True
 
-        # --- single-use item drops (bound to E) ---
-        # get an item on a Tetris or every 10 total lines
-        should_award = (cleared == 4)
-        if not should_award:
-            if prev_lines // 10 < new_total // 10:
-                should_award = True
 
-        if should_award:
-            self.award_random_item()
+
+        if getattr(self, "enable_item_awards", True):
+            should_award = (cleared == 4)
+            if not should_award:
+                if prev_lines // 10 < new_total // 10:
+                    should_award = True
+
+            if should_award:
+                self.award_random_item()
+
 
 
     def lock_piece(self):
-        # impact trigger on any lock
+        # --- special case: an item piece is falling ---
+        if getattr(self, "item_active", False):
+            used = False
+            # trigger the correct effect based on which item is active
+            if self.item_type_active == "bomb":
+                used = self.ability_bomb()
+            elif self.item_type_active == "wave":
+                used = self.item_wave()
+            elif self.item_type_active == "drill":
+                used = self.item_drill()
+            # you could add "robot" here later if you want
 
+            # clear the active flag whether it succeeded or not
+            self.item_active = False
+            self.item_type_active = None
+
+            # after using the item, just go to the next normal piece
+            self.hold_used = False
+            self.current_piece = self.next_piece
+            self.current_piece.x = GRID_WIDTH // 2 - 2
+            self.current_piece.y = -2
+            self.next_piece = self.new_piece()
+
+            # top-out check for the newly spawned normal piece
+            if self.check_collision(self.current_shape(),
+                                    self.current_piece.x,
+                                    self.current_piece.y):
+                self.game_over = True
+                self.win = False
+                self.message = "Top out!"
+                snd = self.sounds.get("game_over")
+                if snd:
+                    snd.play()
+            return
+
+        # --- normal tetromino lock path (your old code) ---
         shape = self.current_shape()
         for r in range(4):
             for c in range(4):
@@ -894,7 +961,11 @@ class TetrisGame:
                     self.grid[y][x] = None
 
         if not any_hit:
+            snd = self.sounds.get("item_fail")
+            if snd:
+                snd.play()
             return False
+
 
         # gravity
         for x in range(GRID_WIDTH):
@@ -916,30 +987,42 @@ class TetrisGame:
         """Give a random single-use item if we don't already have one."""
         if self.item is not None:
             return
-        self.item = random.choice(["bomb", "drill", "wave", "robot"])
+        # VS mode is only using these three right now
+        self.item = random.choice(["bomb", "drill", "wave"])
         self.item_uses_left = 1
 
+        # play "item received" chime
+        snd = self.sounds.get("item_get")
+        if snd:
+            snd.play()
+
+
     def use_item(self):
-        """Activate the currently held item (triggered by the E key)."""
+        """Activate the currently held item: turn the current piece into an item piece."""
         if self.game_over or self.paused:
             return
         if self.item is None or self.item_uses_left <= 0:
             return
 
-        used = False
-        if self.item == "bomb":
-            used = self.item_bomb()
-        elif self.item == "drill":
-            used = self.item_drill()
-        elif self.item == "wave":
-            used = self.item_wave()
-        elif self.item == "robot":
-            used = self.item_robot()
+        # if an item piece is already falling, don't re-activate
+        if self.item_active:
+            return
 
-        if used:
-            self.item_uses_left -= 1
-            if self.item_uses_left <= 0:
-                self.item = None
+        # play item activation sound
+        snd = self.sounds.get("item_use")
+        if snd:
+            snd.play()
+
+        # convert the current tetromino into a falling item piece
+        self.item_active = True
+        self.item_type_active = self.item
+
+        # consume the inventory copy
+        self.item_uses_left -= 1
+        if self.item_uses_left <= 0:
+            self.item = None
+
+
 
     def item_bomb(self):
         """Circular crater in the middle of the field."""
@@ -1212,7 +1295,74 @@ class TetrisGame:
             self.lock_timer = 0.0
 
 # -------------------- DRAWING --------------------
+# Tweak these to match your game
+BOMB_RADIUS = 3          # must match whatever your bomb ability uses
+WAVE_HEIGHT = 4          # number of bottom rows the wave will clear
+DRILL_WIDTH = 3          # how wide the drill tunnel is (columns)
 
+
+def draw_bomb_preview(surface, game, origin_x, origin_y, cell_size, ghost_y):
+    if ghost_y is None:
+        return
+
+    piece = game.current_piece
+    cols = game.cols   # or game.width
+    rows = game.rows   # or game.height
+
+    # Center of blast: center of the 4x4 piece grid
+    center_x = piece.x + 2
+    center_y = ghost_y + 2
+
+    overlay = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+    overlay.fill((255, 255, 150, 120))  # pale yellow, a bit transparent
+
+    for gy in range(rows):
+        for gx in range(cols):
+            dx = gx - center_x
+            dy = gy - center_y
+            if dx * dx + dy * dy <= BOMB_RADIUS * BOMB_RADIUS:
+                sx = origin_x + gx * cell_size
+                sy = origin_y + gy * cell_size
+                surface.blit(overlay, (sx, sy))
+
+
+def draw_drill_preview(surface, game, origin_x, origin_y, cell_size, ghost_y):
+    if ghost_y is None:
+        return
+
+    piece = game.current_piece
+    cols = game.cols
+    rows = game.rows
+
+    # Drill down from the column under the piece center
+    center_col = piece.x + 2
+    left_col = max(0, center_col - DRILL_WIDTH // 2)
+    right_col = min(cols - 1, left_col + DRILL_WIDTH - 1)
+
+    overlay = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+    overlay.fill((255, 255, 100, 100))  # slight yellow vertical strip
+
+    for gy in range(rows):
+        for gx in range(left_col, right_col + 1):
+            sx = origin_x + gx * cell_size
+            sy = origin_y + gy * cell_size
+            surface.blit(overlay, (sx, sy))
+
+
+def draw_wave_preview(surface, game, origin_x, origin_y, cell_size):
+    cols = game.cols
+    rows = game.rows
+    num_rows = min(WAVE_HEIGHT, rows)
+
+    overlay = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+    overlay.fill((120, 180, 255, 120))  # light blue
+
+    start_row = rows - num_rows
+    for gy in range(start_row, rows):
+        for gx in range(cols):
+            sx = origin_x + gx * cell_size
+            sy = origin_y + gy * cell_size
+            surface.blit(overlay, (sx, sy))
 
 def draw_piece_preview(surface, piece_name, x_offset, y_offset):
     shape = ROTATIONS[piece_name][0]
@@ -1263,6 +1413,7 @@ def draw_grid(surface, game, font, mode):
                 r = pygame.Rect(bx, by, BLOCK_SIZE, BLOCK_SIZE)
                 pygame.draw.rect(surface, color, r)
                 pygame.draw.rect(surface, OUTLINE_COLOR, r, 1)
+
 
     # ghost piece
     ghost_y = game.get_ghost_y()
@@ -1391,7 +1542,7 @@ def draw_vs_board(surface, game, font, label_text, origin_x, origin_y):
     pygame.draw.rect(surface, DARK_GREY, field_rect)
     pygame.draw.rect(surface, OUTLINE_COLOR, field_rect, 2)
 
-    # settled blocks
+    # ----- settled blocks -----
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             color = game.grid[y][x]
@@ -1402,39 +1553,112 @@ def draw_vs_board(surface, game, font, label_text, origin_x, origin_y):
                 pygame.draw.rect(surface, color, r)
                 pygame.draw.rect(surface, OUTLINE_COLOR, r, 1)
 
-    # ghost piece
-    ghost_y = game.get_ghost_y()
     piece = game.current_piece
-    shape = piece.shape
-    for r in range(4):
-        for c in range(4):
-            if shape[r][c] == "#":
-                gx = piece.x + c
-                gy = ghost_y + r
-                if gy < 0:
-                    continue
-                if 0 <= gy < GRID_HEIGHT and game.grid[gy][gx] is None:
-                    bx = origin_x + gx * cell
-                    by = origin_y + gy * cell
-                    rct = pygame.Rect(bx, by, cell, cell)
-                    pygame.draw.rect(surface, GHOST_COLOR, rct)
-                    pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
 
-    # current falling piece
-    for r in range(4):
-        for c in range(4):
-            if shape[r][c] == "#":
-                gx = piece.x + c
-                gy = piece.y + r
-                if gy < 0:
-                    continue
-                bx = origin_x + gx * cell
-                by = origin_y + gy * cell
-                rct = pygame.Rect(bx, by, cell, cell)
-                pygame.draw.rect(surface, piece.color, rct)
-                pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
+    # If no active piece, skip falling / ghost drawing but still do grid + flashes
+    if piece is not None:
+        shape = piece.shape
+        is_item_piece = getattr(game, "item_active", False)
 
-    # grid lines
+        # ----- ghost / item preview -----
+        ghost_y = game.get_ghost_y()
+
+        if not is_item_piece:
+            # normal tetromino ghost
+            for r in range(4):
+                for c in range(4):
+                    if shape[r][c] == "#":
+                        gx = piece.x + c
+                        gy = ghost_y + r
+                        if gy < 0:
+                            continue
+                        if 0 <= gy < GRID_HEIGHT and game.grid[gy][gx] is None:
+                            bx = origin_x + gx * cell
+                            by = origin_y + gy * cell
+                            rct = pygame.Rect(bx, by, cell, cell)
+                            pygame.draw.rect(surface, GHOST_COLOR, rct)
+                            pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
+        else:
+            # item previews (drill / wave / bomb)
+            item_id = getattr(game, "item_type_active", None)
+
+            # ---- WAVE: light blue bottom rows ----
+            if item_id == "wave":
+                num_rows = min(WAVE_HEIGHT, GRID_HEIGHT)
+                start_row = GRID_HEIGHT - num_rows
+
+                overlay = pygame.Surface((cell, cell), pygame.SRCALPHA)
+                overlay.fill((120, 180, 255, 120))  # light blue
+
+                for gy in range(start_row, GRID_HEIGHT):
+                    for gx in range(GRID_WIDTH):
+                        bx = origin_x + gx * cell
+                        by = origin_y + gy * cell
+                        surface.blit(overlay, (bx, by))
+
+            # ---- DRILL: vertical yellow strip where it will tunnel ----
+            elif item_id == "drill":
+                center_col = piece.x + 2  # center of 4x4 piece
+                left_col = max(0, center_col - DRILL_WIDTH // 2)
+                right_col = min(GRID_WIDTH - 1, left_col + DRILL_WIDTH - 1)
+
+                overlay = pygame.Surface((cell, cell), pygame.SRCALPHA)
+                overlay.fill((255, 255, 100, 100))  # soft yellow
+
+                for gy in range(GRID_HEIGHT):
+                    for gx in range(left_col, right_col + 1):
+                        bx = origin_x + gx * cell
+                        by = origin_y + gy * cell
+                        surface.blit(overlay, (bx, by))
+
+            # ---- BOMB: yellow circle around where it will land ----
+            elif item_id == "bomb" and ghost_y is not None:
+                center_x = piece.x + 2           # center of 4x4 piece
+                center_y = ghost_y + 2
+
+                overlay = pygame.Surface((cell, cell), pygame.SRCALPHA)
+                overlay.fill((255, 255, 150, 120))
+
+                for gy in range(GRID_HEIGHT):
+                    for gx in range(GRID_WIDTH):
+                        dx = gx - center_x
+                        dy = gy - center_y
+                        if dx * dx + dy * dy <= BOMB_RADIUS * BOMB_RADIUS:
+                            bx = origin_x + gx * cell
+                            by = origin_y + gy * cell
+                            surface.blit(overlay, (bx, by))
+
+        # ----- current falling thing -----
+        if not is_item_piece:
+            # draw normal tetromino
+            for r in range(4):
+                for c in range(4):
+                    if shape[r][c] == "#":
+                        gx = piece.x + c
+                        gy = piece.y + r
+                        if gy < 0:
+                            continue
+                        bx = origin_x + gx * cell
+                        by = origin_y + gy * cell
+                        rct = pygame.Rect(bx, by, cell, cell)
+                        pygame.draw.rect(surface, piece.color, rct)
+                        pygame.draw.rect(surface, OUTLINE_COLOR, rct, 1)
+        else:
+            # draw a big letter representing the active item instead of blocks
+            item_id = getattr(game, "item_type_active", None)
+            letter = ITEM_LETTER.get(item_id, "?")
+
+            # center of the 4x4 piece bounding box in VS cells
+            cx = origin_x + (piece.x + 2) * cell
+            cy = origin_y + (piece.y + 2) * cell
+
+            # only draw if inside / near visible field
+            if cy + cell > origin_y:
+                text_surf = font.render(letter, True, WHITE)
+                text_rect = text_surf.get_rect(center=(cx, cy))
+                surface.blit(text_surf, text_rect)
+
+    # ----- grid lines -----
     for x in range(GRID_WIDTH + 1):
         sx = origin_x + x * cell
         pygame.draw.line(surface, GREY, (sx, origin_y),
@@ -1463,6 +1687,7 @@ def draw_vs_board(surface, game, font, label_text, origin_x, origin_y):
         flash.fill((0, 255, 120, 100))
         surface.blit(flash, (origin_x, origin_y),
                      special_flags=pygame.BLEND_ADD)
+
 
 def draw_vs_player_stats_panel(surface, game, font, rect, item_name):
     """Left stats panel in VS: lines, next, hold, current item."""
@@ -1592,11 +1817,27 @@ class TetrisVsMatch:
         # Use "endless" physics for both sides
         self.player = TetrisGame("endless", controls, sounds, speed_settings)
         self.cpu = TetrisGame("endless", controls, sounds, speed_settings)
+        # VS handles item awards itself (every 5 lines), so disable defaults
+        self.player.enable_item_awards = False
+        self.cpu.enable_item_awards = False
+
+        # how many 5-line chunks the player has already been rewarded for
+        self.player_item_thresholds = 0
+
 
         self.sounds = sounds
         self.font = font
         self.difficulty = difficulty
         self.cpu_frames_sets = cpu_frames_sets or {}
+
+        # Name the CPU based on difficulty (used in chat)
+        if difficulty == "easy":
+            self.cpu_name = "Chiharu"
+        elif difficulty == "hard":
+            self.cpu_name = "Chadlite"
+        else:
+            self.cpu_name = "Greaper"
+
 
         # pick the sprite list for this difficulty (fallback to medium)
         self.cpu_frames = (
@@ -2464,32 +2705,44 @@ class TetrisVsMatch:
 
 
     def _draw_chat_box(self, surface, font, rect):
-        """Render the faux twitch chat inside rect.
+        """Render the faux twitch chat with a separate top title bar."""
 
-        Expects self.chat_lines to be a list of plain strings, newest at end.
-        Your update logic can push to self.chat_lines however you like.
-        """
-        # frame
-        pygame.draw.rect(surface, DARK_GREY, rect)
+        # Outer frame (whole chat region)
+        pygame.draw.rect(surface, BLACK, rect)
         pygame.draw.rect(surface, OUTLINE_COLOR, rect, 2)
 
-        # label
-        label = font.render("chat", True, WHITE)
-        surface.blit(label, (rect.x + 8, rect.y + 4))
+        # ---- HEADER BAR ----
+        header_h = font.get_linesize() + 6
+        header_rect = pygame.Rect(rect.x, rect.y, rect.width, header_h)
 
-        # how many lines fit
+        # fill header and draw a box around just the header area
+        pygame.draw.rect(surface, BLACK, header_rect)
+        pygame.draw.rect(surface, OUTLINE_COLOR, header_rect, 2)
+
+        # Title text in header
+        title_surf = font.render("CHAT", True, WHITE)
+        surface.blit(title_surf, (header_rect.x + 8, header_rect.y + 2))
+
+        # ---- CHAT TEXT AREA (inside the big box, below header) ----
         line_h = font.get_linesize()
-        max_lines = max(1, (rect.height - 10 - line_h) // line_h)
+        text_top = header_rect.bottom + 4
+        text_bottom = rect.bottom - 4
+        usable_h = max(0, text_bottom - text_top)
 
-        # last N lines
+        if usable_h <= 0:
+            return
+
+        max_lines = max(1, usable_h // line_h)
+
         lines = getattr(self, "chat_lines", [])
         visible = lines[-max_lines:]
 
-        y = rect.y + 4 + line_h
+        y = text_top
         for msg in visible:
             surf = font.render(msg, True, GREEN)
             surface.blit(surf, (rect.x + 8, y))
             y += line_h
+
 
     # ---------- MAIN LOOP ----------
     def run(self, state, clock, font):
@@ -2499,47 +2752,68 @@ class TetrisVsMatch:
             events = pygame.event.get()
             key_state = pygame.key.get_pressed()
 
-            # global events (ESC, F11, quit, item key)
+            quit_vs = False
+
+            # global events
             for ev in events:
                 if ev.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_ESCAPE:
-                        running = False
-                    elif ev.key == pygame.K_F11:
+                    if ev.key == pygame.K_F11:
                         toggle_fullscreen(state)
-                    elif ev.key == self.item_key:
-                        # try to use current item
-                        self._activate_item()
+                    elif ev.key == pygame.K_e:
+                        # use the player's current single-use item
+                        self.player.use_item()
+                    elif ev.key == pygame.K_ESCAPE:
+                        # ESC opens pause menu
+                        choice = pause_menu_loop(state, clock, font)
+                        if choice == "quit":
+                            quit_vs = True
+                        elif choice == "restart":
+                            self.player.reset()
+                            self.cpu.reset()
+                        # "resume" just falls through
 
-            # keep CPU paused in sync with player
+                        # "resume" just falls through
+
+            if quit_vs:
+                break
+
+            # keep CPU pause synced with player
             self.cpu.paused = self.player.paused
 
             # update player with real inputs
             self.player.update(dt, key_state, events)
 
-            # update CPU AI
+            # if player hit the pause key (P), open pause menu
+            if self.player.paused and not self.player.game_over:
+                choice = pause_menu_loop(state, clock, font)
+                if choice == "quit":
+                    self.player.paused = False
+                    self.cpu.paused = False
+                    break
+                elif choice == "restart":
+                    self.player.reset()
+                    self.cpu.reset()
+                # resume
+                self.player.paused = False
+                self.cpu.paused = False
+
+            # update CPU AI only if player isn't dead
             if not self.player.game_over:
                 self._update_cpu(dt)
 
-            # item awarding (based on player's clears)
-            self._maybe_award_item()
-
-            # robot auto-placement for the next N pieces
-            if self.player_robot_pieces_left > 0 and not self.player.game_over:
-                current_id = id(self.player.current_piece)
-                if current_id != self.player_piece_id:
-                    # new piece just spawned
-                    self.player_piece_id = current_id
-                    self._robot_place_current_piece()
-                    self.player_robot_pieces_left -= 1
-
-            # attacks & garbage
+            # attacks & garbage + chat
             self._handle_attacks()
-            # update faux twitch chat
             self._update_chat(dt)
-
+            # VS item rule: every 5 lines cleared, try to give the player an item
+            lines = self.player.lines_cleared
+            thresholds = lines // 5
+            if thresholds > self.player_item_thresholds:
+                # may be >1 if they clear a bunch at once; award once per step
+                self.player.award_random_item()
+                self.player_item_thresholds = thresholds
 
 
             # win/lose conditions
@@ -2599,25 +2873,37 @@ class TetrisVsMatch:
                                          cpu_panel_width,
                                          field_height)
 
-            # Chat box: spans under both playfields (stats + boards),
-            # not under the CPU character panel.
+
             chat_top = origin_y + field_height + 30
             chat_height = 140
-            chat_width = (cpu_x + board_width) - origin_x
-            chat_rect = pygame.Rect(origin_x, chat_top,
+            chat_left = stats_rect.x
+            chat_right = cpu_panel_rect.right
+            chat_width = chat_right - chat_left
+            chat_rect = pygame.Rect(chat_left, chat_top,
                                     chat_width, chat_height)
+
+
 
             # ---------- PLAYER STATS PANEL ----------
             stats_label = self.font.render("PLAYER STATS", True, WHITE)
             frame.blit(stats_label, (stats_rect.x, origin_y - 22))
+
+            # get a label for the current item, if any
+            if self.player.item is not None:
+                item_name = self.item_names.get(
+                    self.player.item, self.player.item.upper()
+                )
+            else:
+                item_name = None
 
             draw_vs_player_stats_panel(
                 frame,
                 self.player,
                 self.font,
                 stats_rect,
-                getattr(self, "player_item_name", "None")  # or however you store it
+                item_name,
             )
+
 
             # ---------- BOARDS ----------
             draw_vs_board(frame, self.player, self.font,
@@ -2660,11 +2946,6 @@ class TetrisVsMatch:
             pygame.display.flip()
 
 
-
-
-            apply_curved_crt(frame, screen)
-            pygame.display.flip()
-
 # -------------------- FULLSCREEN STATE --------------------
 
 
@@ -2687,6 +2968,70 @@ def key_name(code):
         return pygame.key.name(code)
     except Exception:
         return str(code)
+
+def pause_menu_loop(state, clock, font):
+    """
+    Simple pause menu.
+    Controls:
+        ↑ / ↓  : move cursor
+        ENTER  : confirm
+        P / ESC: quick resume
+    Returns: "resume", "restart", or "quit"
+    """
+    options = ["Resume", "Restart", "Quit to Main Menu"]
+    selected = 0
+
+    while True:
+        clock.tick(FPS)
+        events = pygame.event.get()
+
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_F11:
+                    toggle_fullscreen(state)
+                elif ev.key in (pygame.K_p, pygame.K_ESCAPE):
+                    return "resume"
+                elif ev.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif ev.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif ev.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    choice = options[selected]
+                    if choice.startswith("Resume"):
+                        return "resume"
+                    elif choice.startswith("Restart"):
+                        return "restart"
+                    else:
+                        return "quit"
+
+        screen = state["screen"]
+        frame = state["frame"]
+        frame.fill(BLACK)
+
+        x0, y0 = 80, 120
+        lh = 30
+
+        title = "== PAUSED =="
+        frame.blit(font.render(title, True, WHITE), (x0, y0))
+
+        hint = "[↑/↓] select   [ENTER] confirm   [P/ESC] resume"
+        frame.blit(font.render(hint, True, GREY), (x0, y0 + lh))
+
+        start_y = y0 + 2 * lh
+        blink_on = (pygame.time.get_ticks() // 400) % 2 == 0
+
+        for i, opt in enumerate(options):
+            prefix = "->" if (i == selected and blink_on) else "  "
+            txt = f"{prefix} {opt}"
+            col = WHITE if i == selected else GREY
+            frame.blit(font.render(txt, True, col),
+                       (x0, start_y + i * lh))
+
+        apply_curved_crt(frame, screen)
+        pygame.display.flip()
 
 
 def menu_loop(state, clock, small_font, controls, speed_settings, sounds):
@@ -2801,8 +3146,10 @@ def settings_loop(state, clock, small_font,
 
     selected = 0
     rebinding_action = None
+
+    # after the keybinds we have DAS, ARR, Soft drop
     extra_start_idx = len(actions_order)
-    total_items = len(actions_order) + 2  # DAS + ARR
+    total_items = len(actions_order) + 3  # DAS + ARR + soft drop
 
     while True:
         clock.tick(FPS)
@@ -2811,7 +3158,9 @@ def settings_loop(state, clock, small_font,
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
             if ev.type == pygame.KEYDOWN:
+                # if we're rebinding a key, ONLY listen for that
                 if rebinding_action is not None:
                     if ev.key == pygame.K_ESCAPE:
                         rebinding_action = None
@@ -2821,42 +3170,61 @@ def settings_loop(state, clock, small_font,
                         snd = sounds.get("menu_select")
                         if snd:
                             snd.play()
-                else:
-                    if ev.key == pygame.K_ESCAPE:
-                        return
-                    if ev.key == pygame.K_F11:
-                        toggle_fullscreen(state)
-                    elif ev.key == pygame.K_UP:
-                        selected = (selected - 1) % total_items
-                        snd = sounds.get("menu_move")
-                        if snd:
-                            snd.play()
-                    elif ev.key == pygame.K_DOWN:
-                        selected = (selected + 1) % total_items
-                        snd = sounds.get("menu_move")
-                        if snd:
-                            snd.play()
-                    elif ev.key in (pygame.K_RETURN, pygame.K_SPACE):
-                        if selected < len(actions_order):
-                            rebinding_action = actions_order[selected]
-                            snd = sounds.get("menu_select")
-                            if snd:
-                                snd.play()
-                    elif ev.key == pygame.K_LEFT:
-                        if selected == extra_start_idx:
-                            speed_settings["das_ms"] = max(
-                                0, speed_settings["das_ms"] - 10)
-                        elif selected == extra_start_idx + 1:
-                            speed_settings["arr_ms"] = max(
-                                10, speed_settings["arr_ms"] - 10)
-                    elif ev.key == pygame.K_RIGHT:
-                        if selected == extra_start_idx:
-                            speed_settings["das_ms"] = min(
-                                400, speed_settings["das_ms"] + 10)
-                        elif selected == extra_start_idx + 1:
-                            speed_settings["arr_ms"] = min(
-                                300, speed_settings["arr_ms"] + 10)
+                    continue  # skip the rest of the handling
 
+                # normal settings navigation / sliders
+                if ev.key == pygame.K_ESCAPE:
+                    return
+                if ev.key == pygame.K_F11:
+                    toggle_fullscreen(state)
+                elif ev.key == pygame.K_UP:
+                    selected = (selected - 1) % total_items
+                    snd = sounds.get("menu_move")
+                    if snd:
+                        snd.play()
+                elif ev.key == pygame.K_DOWN:
+                    selected = (selected + 1) % total_items
+                    snd = sounds.get("menu_move")
+                    if snd:
+                        snd.play()
+                elif ev.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # enter rebind mode if we're on a keybind row
+                    if selected < len(actions_order):
+                        rebinding_action = actions_order[selected]
+                        snd = sounds.get("menu_select")
+                        if snd:
+                            snd.play()
+                elif ev.key == pygame.K_LEFT:
+                    # sliders: DAS / ARR / Soft drop min
+                    if selected == extra_start_idx:
+                        speed_settings["das_ms"] = max(
+                            0, speed_settings["das_ms"] - 10
+                        )
+                    elif selected == extra_start_idx + 1:
+                        speed_settings["arr_ms"] = max(
+                            10, speed_settings["arr_ms"] - 10
+                        )
+                    elif selected == extra_start_idx + 2:
+                        # higher ms = **slower** soft drop floor
+                        speed_settings["soft_drop_min_ms"] = min(
+                            200, speed_settings["soft_drop_min_ms"] + 5
+                        )
+                elif ev.key == pygame.K_RIGHT:
+                    if selected == extra_start_idx:
+                        speed_settings["das_ms"] = min(
+                            400, speed_settings["das_ms"] + 10
+                        )
+                    elif selected == extra_start_idx + 1:
+                        speed_settings["arr_ms"] = min(
+                            300, speed_settings["arr_ms"] + 10
+                        )
+                    elif selected == extra_start_idx + 2:
+                        # lower ms = **faster** soft drop floor
+                        speed_settings["soft_drop_min_ms"] = max(
+                            5, speed_settings["soft_drop_min_ms"] - 5
+                        )
+
+        # ------------- DRAW -------------
         screen = state["screen"]
         frame = state["frame"]
         frame.fill(BLACK)
@@ -2877,6 +3245,7 @@ def settings_loop(state, clock, small_font,
         blink_on = (pygame.time.get_ticks() // 400) % 2 == 0
         start_y = y0 + len(header) * lh
 
+        # keybinding rows
         for i, act in enumerate(actions_order):
             label = action_labels[act]
             key_str = key_name(controls[act])
@@ -2886,30 +3255,44 @@ def settings_loop(state, clock, small_font,
             surf = small_font.render(text, True, col)
             frame.blit(surf, (x0, start_y + i * lh))
 
+        # slider rows
         das_idx = extra_start_idx
         arr_idx = extra_start_idx + 1
+        sd_idx = extra_start_idx + 2
+
         y_das = start_y + len(actions_order) * lh + lh
         y_arr = y_das + lh
+        y_sd = y_arr + lh
 
         prefix_d = "->" if (selected == das_idx and blink_on) else "  "
         prefix_a = "->" if (selected == arr_idx and blink_on) else "  "
+        prefix_s = "->" if (selected == sd_idx and blink_on) else "  "
 
         das_text = f"{prefix_d} DAS (ms): {speed_settings['das_ms']}"
         arr_text = f"{prefix_a} ARR (ms): {speed_settings['arr_ms']}"
+        sd_text = (
+            f"{prefix_s} Soft drop min (ms): "
+            f"{speed_settings['soft_drop_min_ms']}"
+        )
 
         col_d = WHITE if selected == das_idx else GREY
         col_a = WHITE if selected == arr_idx else GREY
+        col_s = WHITE if selected == sd_idx else GREY
+
         frame.blit(small_font.render(das_text, True, col_d),
                    (x0, y_das))
         frame.blit(small_font.render(arr_text, True, col_a),
                    (x0, y_arr))
+        frame.blit(small_font.render(sd_text, True, col_s),
+                   (x0, y_sd))
 
-        hint = "[F11] fullscreen   [ESC] back"
+        hint = "[LEFT/RIGHT] adjust   [F11] fullscreen   [ESC] back"
         frame.blit(small_font.render(hint, True, GREY),
-                   (x0, y_arr + 2 * lh))
+                   (x0, y_sd + 2 * lh))
 
         apply_curved_crt(frame, screen)
         pygame.display.flip()
+
 
 def difficulty_select_loop(state, clock, font, sounds):
     """Small menu that asks for VS difficulty and returns 'easy', 'medium', or 'hard'.
@@ -3160,6 +3543,11 @@ def main():
             freq = 500 + i * 90
             clear_sounds.append(create_tone(freq, 140, 0.35))
 
+        # item / power-up sounds
+        item_get = create_tone(1100, 90, 0.4)      # when you *receive* an item
+        item_use = create_tone(500, 200, 0.45)     # when you *activate* an item
+        item_fail = create_tone(220, 150, 0.35)    # if an item does nothing
+
         sounds = {
             "move": move_sound,
             "drop": drop_sound,
@@ -3168,7 +3556,13 @@ def main():
             "tetris": tetris_jingle,
             "game_over": game_over_jingle,
             "victory": victory_jingle,
+
+            # new:
+            "item_get": item_get,
+            "item_use": item_use,
+            "item_fail": item_fail,
         }
+
         for idx, s in enumerate(clear_sounds):
             sounds[f"clear_{idx}"] = s
         sounds["_clear_count"] = len(clear_sounds)
@@ -3190,48 +3584,48 @@ def main():
     small_font = pygame.font.SysFont("consolas", 20)
 
     controls = DEFAULT_CONTROLS.copy()
-    speed_settings = {"das_ms": 160, "arr_ms": 40}
+    speed_settings = {
+        "das_ms": 160,
+        "arr_ms": 40,
+        "soft_drop_min_ms": 30,  # lower = faster soft drop (ms per row)
+    }
 
     # -------- CPU character frames per difficulty --------
-    # MEDIUM = original (reaper) sprites you already had
-    try:
-        cpu_frames_medium = [
-            pygame.image.load("pixil-frame-0.png").convert_alpha(),
-            pygame.image.load("pixil-frame-1.png").convert_alpha(),
-            pygame.image.load("pixil-frame-2.png").convert_alpha(),
-            pygame.image.load("pixil-frame-3.png").convert_alpha(),
-        ]
-    except Exception:
-        cpu_frames_medium = []
+    def load_frames(prefix: str, count: int, fallback: list | None = None) -> list:
+        """
+        Load a sequence of frames named like:
+            prefix-0.png, prefix-1.png, ...
+        If anything fails and fallback is given, return fallback.
+        """
+        frames = []
+        for i in range(count):
+            filename = f"{prefix}-{i}.png"
+            full_path = resource_path(filename)
+            try:
+                frame = pygame.image.load(full_path).convert_alpha()
+                frames.append(frame)
+            except Exception as e:
+                print(f"Error loading frame '{full_path}': {e}")
+                if fallback is not None:
+                    return fallback
+                return []
+        return frames
+
+    # MEDIUM = pixil frames
+    cpu_frames_medium = load_frames("pixil-frame", 4, fallback=[])
 
     # EASY = anime gamer girl (4 frames: idle A/B, receive, send)
-    try:
-        cpu_frames_easy = [
-            pygame.image.load("anime-0.png").convert_alpha(),
-            pygame.image.load("anime-1.png").convert_alpha(),
-            pygame.image.load("anime-2.png").convert_alpha(),
-            pygame.image.load("anime-3.png").convert_alpha(),
-        ]
-    except Exception:
-        # if anime sprites missing, fall back to medium ones
-        cpu_frames_easy = cpu_frames_medium
+    cpu_frames_easy = load_frames("anime", 4, fallback=cpu_frames_medium)
 
     # HARD = Agartha wizard (4 frames)
-    try:
-        cpu_frames_hard = [
-            pygame.image.load("agartha-0.png").convert_alpha(),
-            pygame.image.load("agartha-1.png").convert_alpha(),
-            pygame.image.load("agartha-2.png").convert_alpha(),
-            pygame.image.load("agartha-3.png").convert_alpha(),
-        ]
-    except Exception:
-        cpu_frames_hard = cpu_frames_medium
+    cpu_frames_hard = load_frames("agartha", 4, fallback=cpu_frames_medium)
 
     cpu_frames_sets = {
         "easy": cpu_frames_easy,
         "medium": cpu_frames_medium,
         "hard": cpu_frames_hard,
     }
+
 
 
 
@@ -3263,22 +3657,50 @@ def main():
         game = TetrisGame(mode, controls, sounds, speed_settings)
 
         running = True
+        game = TetrisGame(mode, controls, sounds, speed_settings)
+
+        running = True
         while running:
             dt = clock.tick(FPS) / 1000.0
             events = pygame.event.get()
             key_state = pygame.key.get_pressed()
+
+            quit_this_run = False
 
             for ev in events:
                 if ev.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_ESCAPE:
-                        running = False
                     if ev.key == pygame.K_F11:
                         toggle_fullscreen(state)
+                    elif ev.key == pygame.K_ESCAPE:
+                        # ESC opens the pause menu instead of insta-quitting
+                        choice = pause_menu_loop(state, clock, small_font)
+                        if choice == "quit":
+                            quit_this_run = True
+                        elif choice == "restart":
+                            game.reset()
+                        # "resume" just returns to gameplay
 
+            if quit_this_run:
+                running = False
+                break
+
+            # normal update
             game.update(dt, key_state, events)
+
+            # if the in-game pause key (P) toggled pause, also show menu
+            if game.paused and not game.game_over:
+                choice = pause_menu_loop(state, clock, small_font)
+                if choice == "quit":
+                    game.paused = False
+                    running = False
+                    break
+                elif choice == "restart":
+                    game.reset()
+                # resume
+                game.paused = False
 
             if mode == "lite" and game.pending_ability_choice \
                     and not game.game_over:
@@ -3295,6 +3717,7 @@ def main():
             draw_grid(frame, game, small_font, mode)
             apply_curved_crt(frame, screen)
             pygame.display.flip()
+
 
 
 if __name__ == "__main__":
